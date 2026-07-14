@@ -3,12 +3,12 @@
 # train.py spawns one worker per visible GPU; CUDA_VISIBLE_DEVICES=0,1 -> 2 ranks.
 set -euo pipefail
 
-REPO=${REPO:-/dccstor/galbloch/DeepSpec}
-CACHE=${CACHE:-/dccstor/galbloch/granite_cache/granite_4_1_8b_target_cache}
+REPO=${REPO:-/dccstor/knewedge/galbloch/DeepSpec}
+CACHE=${CACHE:-/dccstor/knewedge/galbloch/granite_cache/granite_4_1_8b_target_cache}
 CONFIG=config/dspark/dspark_granite_4_1_8b.py
 
-# Keep checkpoints/tensorboard on GPFS, not the 25 GB home quota.
-export HOME_CKPT=${HOME_CKPT:-/dccstor/galbloch/granite_ckpt}
+# Keep checkpoints/tensorboard on GPFS, not the near-full home quota.
+export HOME_CKPT=${HOME_CKPT:-/dccstor/knewedge/galbloch/granite_ckpt}
 
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate granite

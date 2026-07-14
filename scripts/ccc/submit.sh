@@ -6,15 +6,15 @@
 set -euo pipefail
 
 STAGE=${1:?usage: submit.sh {data|train}}
-REPO=${REPO:-/dccstor/galbloch/DeepSpec}
+REPO=${REPO:-/dccstor/knewedge/galbloch/DeepSpec}
 GMODEL=${GMODEL:-NVIDIAA100_SXM4_80GB}
 OUT="${HOME}/%J.stdout"
 ERR="${HOME}/%J.stderr"
 
 # Export REPO/CACHE into the job environment so the scripts pick them up.
 export REPO
-export CACHE=${CACHE:-/dccstor/galbloch/granite_cache/granite_4_1_8b_target_cache}
-export HOME_CKPT=${HOME_CKPT:-/dccstor/galbloch/granite_ckpt}
+export CACHE=${CACHE:-/dccstor/knewedge/galbloch/granite_cache/granite_4_1_8b_target_cache}
+export HOME_CKPT=${HOME_CKPT:-/dccstor/knewedge/galbloch/granite_ckpt}
 
 case "$STAGE" in
   data)

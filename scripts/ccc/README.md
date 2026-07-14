@@ -1,20 +1,21 @@
 # CCC job scripts — Granite DSpark proof-of-concept
 
 Scripts to run the Granite-4.1-8B DSpark speculator pipeline on the IBM CCC
-(LSF) cluster on **2× A100-80GB**, sized for a **~1 TB** target cache.
+(LSF) cluster on **2× A100-80GB**. Proof-of-concept sized for a **~100 GB**
+target cache (the `/dccstor/knewedge` fileset is shared and often near-full).
 
-All paths assume the repo and cache live on GPFS (home is only 25 GB):
+All paths live on GPFS (home quota is small and usually full):
 
 ```
-REPO=/dccstor/galbloch/DeepSpec
-CACHE=/dccstor/galbloch/granite_cache/granite_4_1_8b_target_cache
+REPO=/dccstor/knewedge/galbloch/DeepSpec
+CACHE=/dccstor/knewedge/galbloch/granite_cache/granite_4_1_8b_target_cache
 ```
 
 ## One-time setup on CCC
 
 ```bash
-# from an ssh session on any reachable ccc-login node
-cd /dccstor/galbloch
+# from an ssh session on a reachable ccc-login node
+cd /dccstor/knewedge/galbloch
 git clone -b add-granite-dspark https://github.com/Gal-bloch/DeepSpec.git
 cd DeepSpec
 source $(conda info --base)/etc/profile.d/conda.sh
@@ -39,11 +40,12 @@ marker before reading results (LSF output is GPFS-buffered and lags DONE).
 
 ## Sizing notes
 
-- `--sample-size 11000` → ~10k train samples after the 5% eval split. This is
-  the lever that keeps the cache under 1 TB (per-token cache ~48 KB for this
-  target; verify actual size after a small dry run before trusting the estimate).
-- `max_length=2048` and `target_layer_ids=[2,11,20,29,38]` are set in
-  `config/dspark/dspark_granite_4_1_8b.py`. Do NOT drop layers to save space —
-  shrink `--sample-size` instead.
+- `SAMPLE_SIZE=2200` → ~2k train samples after the 5% eval split, targeting a
+  ~100 GB cache (per-token cache ~48 KB for this target; `00_data.sh` prints the
+  real size and refuses to build if free space < `MIN_FREE_MB`, default 40 GB).
+- `max_length=2048` and `target_layer_ids=[2,11,20,29,38]` (all 5 layers kept)
+  are set in `config/dspark/dspark_granite_4_1_8b.py`, `num_train_epochs=3`.
+  This is a PoC to confirm a nonzero acceptance rate, not a quality checkpoint.
+  To save space, shrink `SAMPLE_SIZE` — do NOT drop target layers.
 - Regen uses greedy decoding (`temperature 0`) for clean, deterministic target
-  answers. Adjust in `01_regen.sh` if you want sampled targets.
+  answers. Adjust in `00_data.sh` if you want sampled targets.

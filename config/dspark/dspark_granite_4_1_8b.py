@@ -42,7 +42,7 @@ train = dict(
     # Proof-of-concept on 2 GPUs: keep global_batch_size divisible by
     # world_size * local_batch_size (2 * 1). 64 gives grad-accum of 32.
     global_batch_size=64,
-    num_train_epochs=10,
+    num_train_epochs=3,
     max_train_steps=None,
     max_grad_norm=1.0,
     sharding_strategy="no_shard",

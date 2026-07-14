@@ -4,12 +4,17 @@
 # a ~10k-sample subset of open-perfectblend, then builds the target cache.
 set -euo pipefail
 
-REPO=${REPO:-/dccstor/galbloch/DeepSpec}
-CACHE=${CACHE:-/dccstor/galbloch/granite_cache/granite_4_1_8b_target_cache}
+REPO=${REPO:-/dccstor/knewedge/galbloch/DeepSpec}
+CACHE=${CACHE:-/dccstor/knewedge/galbloch/granite_cache/granite_4_1_8b_target_cache}
 CONFIG=config/dspark/dspark_granite_4_1_8b.py
 MODEL=ibm-granite/granite-4.1-8b
 
-SAMPLE_SIZE=${SAMPLE_SIZE:-11000}          # ~10k train after 5% eval split
+# PoC sized for ~100 GB cache on the near-full /dccstor/knewedge fileset:
+# ~2k train samples after the 5% eval split. Keeps all 5 target layers.
+SAMPLE_SIZE=${SAMPLE_SIZE:-2200}
+# Abort the cache build if free space on the target fileset drops below this
+# (MB) so we never fill a shared near-full fileset.
+MIN_FREE_MB=${MIN_FREE_MB:-40000}
 TRAIN_SPLIT=train_datasets/perfectblend_train.jsonl
 REGEN=train_datasets/granite_4_1_8b/perfectblend_train_regen.jsonl
 
@@ -70,6 +75,12 @@ sleep 15
 
 echo "=== Step 3/3: build target cache -> ${CACHE} ==="
 mkdir -p "${CACHE}"
+free_mb=$(df -Pm "${CACHE}" | awk 'NR==2{print $4}')
+echo "Free space on target fileset: ${free_mb} MB (guard: ${MIN_FREE_MB} MB)"
+if [ "${free_mb}" -lt "${MIN_FREE_MB}" ]; then
+    echo "ERROR: not enough free space to safely build the cache." >&2
+    exit 1
+fi
 CUDA_VISIBLE_DEVICES=0,1 python scripts/data/prepare_target_cache.py \
     --config "${CONFIG}" \
     --train-data-path "${REGEN}" \
@@ -77,4 +88,5 @@ CUDA_VISIBLE_DEVICES=0,1 python scripts/data/prepare_target_cache.py \
     --local-batch-size 8
 
 echo "Cache size:"; du -sh "${CACHE}" || true
+echo "Free space after build:"; df -h "${CACHE}" | tail -1
 echo "===JOB_COMPLETE==="
