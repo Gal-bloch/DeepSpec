@@ -40,6 +40,16 @@ TEMPLATE_REGISTRY.register(
 )
 
 TEMPLATE_REGISTRY.register(
+    "granite",
+    ChatTemplate(
+        assistant_header="<|start_of_role|>assistant<|end_of_role|>",
+        user_header="<|start_of_role|>user<|end_of_role|>",
+        system_prompt=None,
+        end_of_turn_token="<|end_of_text|>\n",
+    ),
+)
+
+TEMPLATE_REGISTRY.register(
     "gemma4",
     ChatTemplate(
         assistant_header="<|turn>model\n",

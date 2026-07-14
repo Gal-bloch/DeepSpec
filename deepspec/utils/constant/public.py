@@ -8,6 +8,7 @@ QWEN_3_4B = "Qwen/Qwen3-4B"
 QWEN_3_8B = "Qwen/Qwen3-8B"
 QWEN_3_14B = "Qwen/Qwen3-14B"
 GEMMA_4_12B = "google/gemma-4-12B-it"
+GRANITE_4_1_8B = "ibm-granite/granite-4.1-8b"
 BASE_TB_DIR = os.path.expanduser("~/tensorboard")
 BASE_CKPT_DIR = os.path.expanduser("~/checkpoints")
 

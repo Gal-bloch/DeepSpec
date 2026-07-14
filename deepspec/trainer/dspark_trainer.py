@@ -4,6 +4,10 @@ from deepspec.modeling.dspark.gemma4.config import (
     build_draft_config as build_gemma4_draft_config,
 )
 from deepspec.modeling.dspark.loss import compute_dspark_loss
+from deepspec.modeling.dspark.granite import GraniteDSparkModel
+from deepspec.modeling.dspark.granite.config import (
+    build_draft_config as build_granite_draft_config,
+)
 from deepspec.modeling.dspark.qwen3 import Qwen3DSparkModel
 from deepspec.modeling.dspark.qwen3.config import (
     build_draft_config as build_qwen3_draft_config,
@@ -46,3 +50,12 @@ class Gemma4DSparkTrainer(Qwen3DSparkTrainer):
             model_args=model_args,
         )
         return Gemma4DSparkModel(draft_config)
+
+
+class GraniteDSparkTrainer(Qwen3DSparkTrainer):
+    def _build_draft_model(self, *, target_config, model_args):
+        draft_config = build_granite_draft_config(
+            target_config=target_config,
+            model_args=model_args,
+        )
+        return GraniteDSparkModel(draft_config)
