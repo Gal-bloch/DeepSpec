@@ -34,14 +34,20 @@ export TMPDIR=${TMPDIR:-/dccstor/knewedge/galbloch/tmp}
 mkdir -p "${HF_HOME}" "${TMPDIR}"
 cd "$REPO"
 
-echo "=== Step 1/3: download + subset open-perfectblend (sample-size=${SAMPLE_SIZE}) ==="
-"$PY" scripts/data/download_and_split.py \
-    --dataset-name mlabonne/open-perfectblend \
-    --sample-size "${SAMPLE_SIZE}" \
-    --test-size 0.05 \
-    --train-output-path "${TRAIN_SPLIT}" \
-    --test-output-dir eval_datasets \
-    --skip-existing
+echo "=== Step 1/3: stream-subset open-perfectblend (max-rows=${SAMPLE_SIZE}) ==="
+# Stream only the rows we need instead of downloading the full multi-GB dataset
+# (upstream download_and_split.py pulls everything, then .select()s — too slow
+# and wasteful for a ~2k-row PoC).
+if [ -s "${TRAIN_SPLIT}" ]; then
+    echo "train split already present: ${TRAIN_SPLIT} ($(wc -l < "${TRAIN_SPLIT}") rows) — skipping"
+else
+    "$PY" scripts/ccc/prep_subset.py \
+        --dataset-name mlabonne/open-perfectblend \
+        --max-rows "${SAMPLE_SIZE}" \
+        --eval-frac 0.05 \
+        --train-out "${TRAIN_SPLIT}" \
+        --eval-out eval_datasets/perfectblend.jsonl
+fi
 
 if [ "${SKIP_REGEN}" = "1" ]; then
     echo "=== Step 2/3: SKIPPED (SKIP_REGEN=1) — caching original dataset answers ==="
