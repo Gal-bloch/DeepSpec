@@ -28,7 +28,7 @@ export DEEPSPEC_BASE_CKPT_DIR="${HOME_CKPT}/checkpoints"
 export DEEPSPEC_BASE_TB_DIR="${HOME_CKPT}/tensorboard"
 mkdir -p "${DEEPSPEC_BASE_CKPT_DIR}" "${DEEPSPEC_BASE_TB_DIR}"
 
-CUDA_VISIBLE_DEVICES=0,1 "$PY" train.py \
+CUDA_VISIBLE_DEVICES=${CUDA_DEVICES:-0} "$PY" train.py \
     --config "${CONFIG}" \
     --opts "data.target_cache_path=${CACHE}"
 

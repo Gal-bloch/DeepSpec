@@ -94,7 +94,7 @@ if [ "${free_mb}" -lt "${MIN_FREE_MB}" ]; then
     echo "ERROR: not enough free space to safely build the cache." >&2
     exit 1
 fi
-CUDA_VISIBLE_DEVICES=0,1 "$PY" scripts/data/prepare_target_cache.py \
+CUDA_VISIBLE_DEVICES=${CUDA_DEVICES:-0} "$PY" scripts/data/prepare_target_cache.py \
     --config "${CONFIG}" \
     --train-data-path "${CACHE_INPUT}" \
     --output-dir "${CACHE}" \

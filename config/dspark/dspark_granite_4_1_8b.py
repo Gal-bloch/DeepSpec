@@ -39,9 +39,9 @@ train = dict(
     weight_decay=0.0,
     precision="bf16",
     local_batch_size=1,
-    # Proof-of-concept on 2 GPUs: keep global_batch_size divisible by
-    # world_size * local_batch_size (2 * 1). 64 gives grad-accum of 32.
-    global_batch_size=64,
+    # Proof-of-concept on 1 GPU: grad-accum = global/(world_size*local) = 16/1.
+    # Must stay divisible by world_size*local_batch_size if GPU count changes.
+    global_batch_size=16,
     num_train_epochs=3,
     max_train_steps=None,
     max_grad_norm=1.0,
