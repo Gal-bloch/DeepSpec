@@ -97,11 +97,16 @@ if [ "${free_mb}" -lt "${MIN_FREE_MB}" ]; then
     echo "ERROR: not enough free space to safely build the cache." >&2
     exit 1
 fi
+# num-workers 0: collate in the main process. Multi-worker dataloaders can
+# deadlock on CCC (fork + tokenizer), leaving the GPU idle before batch 0.
+# TOKENIZERS_PARALLELISM=false avoids the fork/parallelism warning+contention.
+export TOKENIZERS_PARALLELISM=false
 CUDA_VISIBLE_DEVICES=${CUDA_DEVICES:-0} "$PY" scripts/data/prepare_target_cache.py \
     --config "${CONFIG}" \
     --train-data-path "${CACHE_INPUT}" \
     --output-dir "${CACHE}" \
-    --local-batch-size 8
+    --local-batch-size 8 \
+    --num-workers "${CACHE_NUM_WORKERS:-0}"
 
 echo "Cache size:"; du -sh "${CACHE}" || true
 echo "Free space after build:"; df -h "${CACHE}" | tail -1
