@@ -33,6 +33,9 @@ export HF_HOME=${HF_HOME:-/dccstor/knewedge/galbloch/.cache/hf}
 export TMPDIR=${TMPDIR:-/dccstor/knewedge/galbloch/tmp}
 mkdir -p "${HF_HOME}" "${TMPDIR}"
 cd "$REPO"
+# The repo is not pip-installed; running a script under scripts/data/ puts that
+# dir on sys.path, not the repo root, so `import deepspec` fails. Add repo root.
+export PYTHONPATH="${REPO}:${PYTHONPATH:-}"
 
 echo "=== Step 1/3: stream-subset open-perfectblend (max-rows=${SAMPLE_SIZE}) ==="
 # Stream only the rows we need instead of downloading the full multi-GB dataset

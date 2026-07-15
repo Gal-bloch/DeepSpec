@@ -15,6 +15,8 @@ export HF_HOME=${HF_HOME:-/dccstor/knewedge/galbloch/.cache/hf}
 export TMPDIR=${TMPDIR:-/dccstor/knewedge/galbloch/tmp}
 mkdir -p "${HF_HOME}" "${TMPDIR}"
 cd "$REPO"
+# Repo is not pip-installed; ensure `import deepspec` resolves from repo root.
+export PYTHONPATH="${REPO}:${PYTHONPATH:-}"
 
 echo "=== Training Granite DSpark draft (2x A100) ==="
 echo "cache=${CACHE}"
