@@ -14,6 +14,8 @@ export HOME_CKPT=${HOME_CKPT:-/dccstor/knewedge/galbloch/granite_ckpt}
 export HF_HOME=${HF_HOME:-/dccstor/knewedge/galbloch/.cache/hf}
 export TMPDIR=${TMPDIR:-/dccstor/knewedge/galbloch/tmp}
 mkdir -p "${HF_HOME}" "${TMPDIR}"
+HF_TOKEN_FILE=${HF_TOKEN_FILE:-/dccstor/knewedge/galbloch/.hf_token}
+[ -f "${HF_TOKEN_FILE}" ] && export HF_TOKEN="$(cat "${HF_TOKEN_FILE}")"
 cd "$REPO"
 # Repo is not pip-installed; ensure `import deepspec` resolves from repo root.
 export PYTHONPATH="${REPO}:${PYTHONPATH:-}"

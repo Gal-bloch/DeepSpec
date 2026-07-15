@@ -32,6 +32,9 @@ SGLANG_NCCL_PORT=31000
 export HF_HOME=${HF_HOME:-/dccstor/knewedge/galbloch/.cache/hf}
 export TMPDIR=${TMPDIR:-/dccstor/knewedge/galbloch/tmp}
 mkdir -p "${HF_HOME}" "${TMPDIR}"
+# Authenticated HF downloads (unauthenticated is throttled to a trickle).
+HF_TOKEN_FILE=${HF_TOKEN_FILE:-/dccstor/knewedge/galbloch/.hf_token}
+[ -f "${HF_TOKEN_FILE}" ] && export HF_TOKEN="$(cat "${HF_TOKEN_FILE}")"
 cd "$REPO"
 # The repo is not pip-installed; running a script under scripts/data/ puts that
 # dir on sys.path, not the repo root, so `import deepspec` fails. Add repo root.
