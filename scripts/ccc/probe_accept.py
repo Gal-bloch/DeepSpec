@@ -45,6 +45,10 @@ def main():
     evaluator = GraniteDSparkEvaluator(0, args)
 
     print(f"[probe] running {a.task} on {a.max_samples} samples...", flush=True)
+    # The real evaluate() loop calls start() before each dataset (it initializes
+    # the recorder's dataset_metrics). We drive run_dataset() directly, so do it here.
+    if getattr(evaluator, "confidence_head_recorder", None) is not None:
+        evaluator.confidence_head_recorder.start()
     responses = evaluator.run_dataset(dataset_name=a.task, max_samples=a.max_samples)
     summary = evaluator.allreduce_response_metrics(responses)
     row = evaluator.build_metrics_row(dataset_name=a.task, metric_summary=summary)
