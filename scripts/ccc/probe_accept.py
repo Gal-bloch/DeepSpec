@@ -21,15 +21,13 @@ def main():
     ap.add_argument("--max-new-tokens", type=int, default=256)
     a = ap.parse_args()
 
-    # Single-process distributed group so the evaluator's dist.* calls work
-    # without the multiprocessing spawn that deadlocked.
+    # Provide the env vars init_dist() reads, but DON'T init the process group
+    # ourselves — the evaluator's __init__ calls init_dist(local_rank=0), which
+    # would then fail with "initialize the default process group twice".
     os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
     os.environ.setdefault("MASTER_PORT", "29555")
     os.environ.setdefault("RANK", "0")
     os.environ.setdefault("WORLD_SIZE", "1")
-    if not dist.is_initialized():
-        dist.init_process_group(backend="nccl", rank=0, world_size=1)
-    torch.cuda.set_device(0)
 
     from deepspec.eval.dspark import GraniteDSparkEvaluator
 
