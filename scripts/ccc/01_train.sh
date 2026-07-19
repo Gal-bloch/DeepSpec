@@ -26,6 +26,12 @@ export TOKENIZERS_PARALLELISM=false
 export CUDA_HOME=${CUDA_HOME:-/usr/local/cuda}
 export PATH="${CUDA_HOME}/bin:${PATH}"
 export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH:-}"
+# Triton/Inductor compile caches: put on NODE-LOCAL /tmp and make them job-unique.
+# 8 ranks sharing the default (GPFS) cache concurrently races on the cuda_utils
+# .so build and fails intermittently ('gcc ... cuda_utils.c ... exit 1').
+export TRITON_CACHE_DIR=${TRITON_CACHE_DIR:-/tmp/${USER}_triton_${LSB_JOBID:-$$}}
+export TORCHINDUCTOR_CACHE_DIR=${TORCHINDUCTOR_CACHE_DIR:-/tmp/${USER}_inductor_${LSB_JOBID:-$$}}
+mkdir -p "${TRITON_CACHE_DIR}" "${TORCHINDUCTOR_CACHE_DIR}"
 mkdir -p "${HF_HOME}" "${TMPDIR}"
 HF_TOKEN_FILE=${HF_TOKEN_FILE:-${SCRATCH}/.hf_token}
 [ -f "${HF_TOKEN_FILE}" ] && export HF_TOKEN="$(cat "${HF_TOKEN_FILE}")"
