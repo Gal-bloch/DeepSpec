@@ -80,11 +80,14 @@ echo "--- phaseB tail ---"; tail -n 20 "${LOGB}"
 pass=0; fail=0
 chk(){ if eval "$2"; then echo "PASS: $1"; pass=$((pass+1)); else echo "FAIL: $1"; fail=$((fail+1)); fi; }
 
-# 1. startup host RAM ~1x target, not NUM_GPUS x  (peak python RSS sampled above, KB)
-echo "peak python RSS (phaseA, KB) = ${PEAK_KB:-unknown}"
-# 8B bf16 ~16GB; 1x load should stay well under ~60GB. 8x would be >100GB.
-chk "startup host RAM under ~60GB (rank-0 broadcast worked, not ${NUM_GPUS}x load)" \
-    "[ -n \"${PEAK_KB}\" ] && [ \"${PEAK_KB}\" -gt 0 ] && [ \"${PEAK_KB}\" -lt 62914560 ]"
+# 1. startup host RAM: PEAK_KB SUMS all python ranks on the node. With the rank-0
+# broadcast fix, only ONE rank loads the 8B target (~16GB) while the others hold
+# just their draft+CUDA context (~8-10GB each). So ~8 ranks * ~10GB + one 16GB
+# spike is normal/healthy (~90GB). A regression to 8x FULL target loads would be
+# ~128GB + contexts (>180GB). Threshold set to catch that regression, not normal use.
+echo "peak python RSS summed-over-ranks (phaseA, KB) = ${PEAK_KB:-unknown}"
+chk "startup host RAM sane (rank-0 broadcast worked, not ${NUM_GPUS}x full target load)" \
+    "[ -n \"${PEAK_KB}\" ] && [ \"${PEAK_KB}\" -gt 0 ] && [ \"${PEAK_KB}\" -lt 157286400 ]"
 # 2. loss line present & finite in phase A
 chk "training produced loss lines (compile+flex+fsdp ran)" \
     "grep -qE 'loss[= ]' '${LOGA}'"

@@ -334,17 +334,22 @@ class BaseTrainer:
             start_global_offset_samples=start_offset_samples,
             num_samples=num_samples,
         )
-        return DataLoader(
-            self.train_dataset,
+        num_workers = int(self.args.data.num_workers)
+        loader_kwargs = dict(
             batch_size=int(self.args.train.local_batch_size),
             sampler=sampler,
             collate_fn=self.data_collator_cls(),
-            num_workers=int(self.args.data.num_workers),
+            num_workers=num_workers,
             pin_memory=True,
             drop_last=True,
-            persistent_workers=True,
-            prefetch_factor=4,
         )
+        # persistent_workers/prefetch_factor are only valid with worker processes;
+        # PyTorch raises if they're passed when num_workers=0 (the deadlock-safe
+        # setting used on clusters where the fork+tokenizer dataloader hangs).
+        if num_workers > 0:
+            loader_kwargs["persistent_workers"] = True
+            loader_kwargs["prefetch_factor"] = 4
+        return DataLoader(self.train_dataset, **loader_kwargs)
 
     def run_batch(self, batch):
         raise NotImplementedError
