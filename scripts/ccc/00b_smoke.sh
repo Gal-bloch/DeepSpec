@@ -52,9 +52,22 @@ OPTS_COMMON=(--opts "exp_name=${EXP}" \
              --opts "logging.checkpointing_steps=4")
 
 # ---- Phase A: run to first checkpoint (cap at 4 steps) -----------------------
+# Portable peak-RSS sampler (bv compute nodes lack /usr/bin/time): poll node RSS of
+# all python procs every 2s while Phase A runs, record the max KB to a file.
+RSSFILE="${TMPDIR}/smoke_peak_rss_kb"; echo 0 > "${RSSFILE}"
+( while true; do
+    tot=$(ps -eo rss,comm 2>/dev/null | awk '/python/{s+=$1} END{print s+0}')
+    cur=$(cat "${RSSFILE}" 2>/dev/null || echo 0)
+    [ "${tot:-0}" -gt "${cur:-0}" ] && echo "${tot}" > "${RSSFILE}"
+    sleep 2
+  done ) & RSS_PID=$!
+
 echo "############ PHASE A: train to step 4 (checkpoint) ############"
-/usr/bin/time -v "$PY" train.py --config "${CONFIG}" \
+"$PY" train.py --config "${CONFIG}" \
     "${OPTS_COMMON[@]}" --opts "train.max_train_steps=4" > "${LOGA}" 2>&1 || true
+kill "${RSS_PID}" 2>/dev/null || true
+PEAK_KB=$(cat "${RSSFILE}" 2>/dev/null || echo 0)
+echo "peak python RSS (phaseA, KB) = ${PEAK_KB}" | tee -a "${LOGA}"
 echo "--- phaseA tail ---"; tail -n 20 "${LOGA}"
 
 # ---- Phase B: relaunch same exp -> must auto-resume from step 4 to step 8 ----
@@ -67,12 +80,11 @@ echo "--- phaseB tail ---"; tail -n 20 "${LOGB}"
 pass=0; fail=0
 chk(){ if eval "$2"; then echo "PASS: $1"; pass=$((pass+1)); else echo "FAIL: $1"; fail=$((fail+1)); fi; }
 
-# 1. startup host RAM ~1x target, not NUM_GPUS x  (peak RSS from /usr/bin/time, KB)
-PEAK_KB=$(grep -a "Maximum resident set size" "${LOGA}" | tail -1 | grep -oE "[0-9]+" | tail -1)
-echo "peak RSS (phaseA, KB) = ${PEAK_KB:-unknown}"
-# 8B bf16 ~16GB; 1x load should stay well under ~40GB. 8x would be >100GB.
+# 1. startup host RAM ~1x target, not NUM_GPUS x  (peak python RSS sampled above, KB)
+echo "peak python RSS (phaseA, KB) = ${PEAK_KB:-unknown}"
+# 8B bf16 ~16GB; 1x load should stay well under ~60GB. 8x would be >100GB.
 chk "startup host RAM under ~60GB (rank-0 broadcast worked, not ${NUM_GPUS}x load)" \
-    "[ -n \"${PEAK_KB}\" ] && [ \"${PEAK_KB}\" -lt 62914560 ]"
+    "[ -n \"${PEAK_KB}\" ] && [ \"${PEAK_KB}\" -gt 0 ] && [ \"${PEAK_KB}\" -lt 62914560 ]"
 # 2. loss line present & finite in phase A
 chk "training produced loss lines (compile+flex+fsdp ran)" \
     "grep -qE 'loss[= ]' '${LOGA}'"

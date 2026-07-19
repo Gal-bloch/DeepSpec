@@ -16,6 +16,7 @@ STAGE=${1:?usage: submit.sh {smoke|data|train}}
 SCRATCH=${SCRATCH:-/dccstor/knewedge/galbloch}
 REPO=${REPO:-${SCRATCH}/DeepSpec}
 NUM_GPUS=${NUM_GPUS:-8}
+GROUP=${GROUP:-grp_ai_compiler_design}  # bv (BlueVela) esub requires -G <group>
 GMODEL=${GMODEL:-NVIDIAH10080GBHBM3}
 NCORES=${NCORES:-$((NUM_GPUS > 4 ? NUM_GPUS : 4))}
 WALLTIME=${WALLTIME:-10080}
@@ -38,7 +39,7 @@ case "$STAGE" in
 esac
 
 set -x
-bsub -n "${NCORES}" -R "span[hosts=1]" \
+bsub -G "${GROUP}" -n "${NCORES}" -R "span[hosts=1]" \
      -gpu "num=${NUM_GPUS}:gmodel=${GMODEL}" \
      -W "${W}" \
      "${RES_FLAG[@]}" "${Q_FLAG[@]}" \
