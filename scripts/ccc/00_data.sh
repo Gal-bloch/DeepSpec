@@ -41,6 +41,11 @@ REGEN_OUT=${REGEN_OUT:-train_datasets/granite_4_1_8b/perfectblend_train_regen.js
 export HF_HOME=${HF_HOME:-${SCRATCH}/.cache/hf}
 export TMPDIR=${TMPDIR:-${SCRATCH}/tmp}
 export TOKENIZERS_PARALLELISM=false
+# CUDA toolkit for inductor/Triton (flex_attention compiles a CUDA helper).
+# On bv, nvcc/CUDA_HOME are not on the default job env though the toolkit exists.
+export CUDA_HOME=${CUDA_HOME:-/usr/local/cuda}
+export PATH="${CUDA_HOME}/bin:${PATH}"
+export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH:-}"
 mkdir -p "${HF_HOME}" "${TMPDIR}"
 HF_TOKEN_FILE=${HF_TOKEN_FILE:-${SCRATCH}/.hf_token}
 [ -f "${HF_TOKEN_FILE}" ] && export HF_TOKEN="$(cat "${HF_TOKEN_FILE}")"
