@@ -33,6 +33,12 @@ export TOKENIZERS_PARALLELISM=false
 export CUDA_HOME=${CUDA_HOME:-/usr/local/cuda}
 export PATH="${CUDA_HOME}/bin:${PATH}"
 export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH:-}"
+# Use plain gcc for triton/inductor builds, NOT the /usr/lib64/ccache/gcc wrapper:
+# ccache (default ~/.ccache on GPFS) fails inside multi-rank jobs, breaking the
+# flex_attention CUDA-helper build ('cuda_utils.c ... exit 1'). Plain gcc works.
+export CC=${CC:-/usr/bin/gcc}
+export CXX=${CXX:-/usr/bin/g++}
+export TRITON_CC=${TRITON_CC:-/usr/bin/gcc}
 # Triton/Inductor compile caches: put on NODE-LOCAL /tmp and make them job-unique.
 # 8 ranks sharing the default (GPFS) cache concurrently races on the cuda_utils
 # .so build and fails intermittently ('gcc ... cuda_utils.c ... exit 1').
