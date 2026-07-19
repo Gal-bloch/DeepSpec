@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from types import SimpleNamespace
 import math
 import os
 
@@ -264,21 +265,53 @@ class BaseTrainer:
         )
         draft_model = draft_model.to(device=self.device, dtype=self.precision_dtype)
 
-        # Training only uses the target checkpoint to initialize frozen draft
-        # embeddings and lm_head weights.
-        target_model = AutoModelForCausalLM.from_pretrained(
-            model_args.target_model_name_or_path,
-            dtype=self.precision_dtype,
-        ).to(device="cpu").eval()
-        target_embed_tokens = target_model.get_input_embeddings()
-        target_lm_head = target_model.get_output_embeddings()
-        assert (target_lm_head is not None) and (target_embed_tokens is not None)
+        # Training only uses the target checkpoint to initialize the frozen draft
+        # embeddings and lm_head weights. Loading the full target on EVERY rank at
+        # once is an ~8x host-RAM spike (e.g. ~128 GB for an 8B target on 8 GPUs) and
+        # can OOM-kill the job at startup. Instead load it on ONE rank, extract the
+        # two weight tensors, and broadcast them to the other ranks. The draft's own
+        # embed/lm_head are already allocated on every rank with identical shapes, so
+        # non-source ranks broadcast into buffers of the known shape.
+        embed_shape = tuple(draft_model.embed_tokens.weight.shape)
+        head_shape = tuple(draft_model.lm_head.weight.shape)
+        is_source = (not dist.is_initialized()) or dist.get_rank() == 0
+
+        if is_source:
+            target_model = AutoModelForCausalLM.from_pretrained(
+                model_args.target_model_name_or_path,
+                dtype=self.precision_dtype,
+                low_cpu_mem_usage=True,
+            ).to(device="cpu").eval()
+            target_embed_tokens = target_model.get_input_embeddings()
+            target_lm_head = target_model.get_output_embeddings()
+            assert (target_lm_head is not None) and (target_embed_tokens is not None)
+            embed_w = target_embed_tokens.weight.detach().to(
+                device=self.device, dtype=self.precision_dtype
+            )
+            head_w = target_lm_head.weight.detach().to(
+                device=self.device, dtype=self.precision_dtype
+            )
+            del target_model
+        else:
+            embed_w = torch.empty(
+                embed_shape, device=self.device, dtype=self.precision_dtype
+            )
+            head_w = torch.empty(
+                head_shape, device=self.device, dtype=self.precision_dtype
+            )
+
+        if dist.is_initialized() and dist.get_world_size() > 1:
+            dist.broadcast(embed_w, src=0)
+            dist.broadcast(head_w, src=0)
+
+        # initialize_embeddings_and_head only reads `.weight`; wrap the broadcast
+        # tensors in lightweight shims so every model family's implementation works.
         draft_model.initialize_embeddings_and_head(
-            embed_tokens=target_embed_tokens,
-            lm_head=target_lm_head,
+            embed_tokens=SimpleNamespace(weight=embed_w),
+            lm_head=SimpleNamespace(weight=head_w),
             freeze=True,
         )
-        del target_model
+        del embed_w, head_w
         return draft_model, tokenizer
 
     def _build_draft_model(self, *, target_config, model_args):

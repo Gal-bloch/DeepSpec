@@ -39,28 +39,38 @@ train = dict(
     weight_decay=0.0,
     precision="bf16",
     local_batch_size=1,
-    # Proof-of-concept on 1 GPU: grad-accum = global/(world_size*local) = 16/1.
-    # Must stay divisible by world_size*local_batch_size if GPU count changes.
-    global_batch_size=16,
-    num_train_epochs=3,
+    # Full 8-GPU / full-data run matches the DSpark paper's own setup, so these
+    # revert to the proven Qwen3 defaults. global_batch_size must stay divisible by
+    # world_size*local_batch_size (base_trainer._compute_gradient_accumulation_steps):
+    # on 8 GPUs with local_batch_size=1, 512 -> grad-accum 64.
+    global_batch_size=512,
+    num_train_epochs=10,
     max_train_steps=None,
     max_grad_norm=1.0,
+    # no_shard is the only strategy exercised by any repo config; the custom
+    # BF16Optimizer is not FSDP-shard-safe. The draft is small (5 layers) so
+    # no_shard's replicated optimizer state is fine on a large-memory node.
     sharding_strategy="no_shard",
+    # Validated by the pre-flight smoke test (scripts/ccc/00b_smoke.sh); flip to
+    # False if flex_attention triggers a recompile storm at scale.
     torch_compile=True,
 )
 
 logging = dict(
     logging_steps=10,
-    checkpointing_steps=1000,
+    checkpointing_steps=3000,
 )
 
 data = dict(
     target_cache_path=None,
     chat_template="granite",
-    # Shorter than the 4096 default to keep the target cache within ~1 TB
-    # for the proof-of-concept run.
-    max_length=2048,
-    num_workers=4,
+    # Full DSpark default. NOTE: drives target-cache size (tens of TB for full data).
+    max_length=4096,
+    # 0 is deliberate: persistent_workers=True is hardcoded in base_trainer and the
+    # CUDAPrefetcher + persistent-workers combo deadlocked in the PoC. A dataloader
+    # hang on a multi-day 8-GPU job wastes the whole allocation; 0 is the proven-safe
+    # value. Raise only if the smoke test proves >0 is stable at scale.
+    num_workers=0,
 )
 
 

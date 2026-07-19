@@ -1,44 +1,50 @@
 #!/bin/bash
-# Submit Granite DSpark CCC jobs via LSF bsub.
-#   bash scripts/ccc/submit.sh data    # data pipeline (1 node, 2 GPUs for cache)
-#   bash scripts/ccc/submit.sh train   # draft training (2 A100-80GB)
-# Run this FROM a ccc-login node (inside the repo on GPFS).
+# Submit Granite DSpark CCC jobs via LSF bsub. Parameterized for any single-node
+# multi-GPU allocation (not just the NCU-reserved node).
+#
+#   bash scripts/ccc/submit.sh smoke   # pre-flight 8-GPU smoke + resume test (do FIRST)
+#   bash scripts/ccc/submit.sh data    # full-data target-cache build
+#   bash scripts/ccc/submit.sh train   # full drafter training
+#
+# Allocation knobs (env): NUM_GPUS (default 8), GMODEL, RESERVATION (optional -U),
+#   QUEUE (optional -q), WALLTIME minutes (default 10080 = 7d), NCORES, SCRATCH.
+# NOTE: no -M/-hl — a hard memory limit produced a bogus 200 TB MEMLIMIT that made
+# GPU jobs un-schedulable on CCC. Let LSF use node defaults.
 set -euo pipefail
 
-STAGE=${1:?usage: submit.sh {data|train}}
-REPO=${REPO:-/dccstor/knewedge/galbloch/DeepSpec}
-GMODEL=${GMODEL:-NVIDIAA100_SXM4_80GB}
-OUT="${HOME}/%J.stdout"
-ERR="${HOME}/%J.stderr"
+STAGE=${1:?usage: submit.sh {smoke|data|train}}
+SCRATCH=${SCRATCH:-/dccstor/knewedge/galbloch}
+REPO=${REPO:-${SCRATCH}/DeepSpec}
+NUM_GPUS=${NUM_GPUS:-8}
+GMODEL=${GMODEL:-NVIDIAH10080GBHBM3}
+NCORES=${NCORES:-$((NUM_GPUS > 4 ? NUM_GPUS : 4))}
+WALLTIME=${WALLTIME:-10080}
+OUT="${HOME}/%J.stdout"; ERR="${HOME}/%J.stderr"
 
-# Export REPO/CACHE into the job environment so the scripts pick them up.
-export REPO
-export CACHE=${CACHE:-/dccstor/knewedge/galbloch/granite_cache/granite_4_1_8b_target_cache}
-export HOME_CKPT=${HOME_CKPT:-/dccstor/knewedge/galbloch/granite_ckpt}
+# Forward everything the job scripts read.
+export SCRATCH REPO NUM_GPUS
+export CACHE=${CACHE:-${SCRATCH}/granite_cache/granite_4_1_8b_target_cache}
+export CKPT_ROOT=${CKPT_ROOT:-${SCRATCH}/granite_ckpt}
+
+# Optional reservation / queue (only added if set).
+RES_FLAG=(); [ -n "${RESERVATION:-}" ] && RES_FLAG=(-U "${RESERVATION}")
+Q_FLAG=(); [ -n "${QUEUE:-}" ] && Q_FLAG=(-q "${QUEUE}")
 
 case "$STAGE" in
-  data)
-    SCRIPT="${REPO}/scripts/ccc/00_data.sh"
-    # Serving + cache build; 2 GPUs, generous memory + walltime for regen.
-    bsub -M 204800 -hl -n 8 -R "span[hosts=1]" \
-         -gpu "num=2:gmodel=${GMODEL}" \
-         -W 1440 \
-         -o "$OUT" -e "$ERR" \
-         -env "all" \
-         bash "$SCRIPT"
-    ;;
-  train)
-    SCRIPT="${REPO}/scripts/ccc/01_train.sh"
-    bsub -M 204800 -hl -n 8 -R "span[hosts=1]" \
-         -gpu "num=2:gmodel=${GMODEL}" \
-         -W 1440 \
-         -o "$OUT" -e "$ERR" \
-         -env "all" \
-         bash "$SCRIPT"
-    ;;
-  *)
-    echo "unknown stage: $STAGE (want data|train)" >&2; exit 1;;
+  smoke) SCRIPT="${REPO}/scripts/ccc/00b_smoke.sh"; W=${SMOKE_WALL:-90} ;;
+  data)  SCRIPT="${REPO}/scripts/ccc/00_data.sh";  W="${WALLTIME}" ;;
+  train) SCRIPT="${REPO}/scripts/ccc/01_train.sh"; W="${WALLTIME}" ;;
+  *) echo "unknown stage: $STAGE (want smoke|data|train)" >&2; exit 1 ;;
 esac
 
-echo "Submitted ${STAGE}. Watch with: bjobs ; tail -f ${HOME}/<jobid>.stdout"
-echo "Job prints ===JOB_COMPLETE=== on success."
+set -x
+bsub -n "${NCORES}" -R "span[hosts=1]" \
+     -gpu "num=${NUM_GPUS}:gmodel=${GMODEL}" \
+     -W "${W}" \
+     "${RES_FLAG[@]}" "${Q_FLAG[@]}" \
+     -o "$OUT" -e "$ERR" -env "all" \
+     bash "$SCRIPT"
+set +x
+
+echo "Submitted ${STAGE} (NUM_GPUS=${NUM_GPUS}, gmodel=${GMODEL}, wall=${W}m${RESERVATION:+, -U ${RESERVATION}})."
+echo "Watch: bjobs ; tail -f ${HOME}/<jobid>.stdout   (job prints ===JOB_COMPLETE===)"
