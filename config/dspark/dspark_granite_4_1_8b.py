@@ -51,9 +51,12 @@ train = dict(
     # BF16Optimizer is not FSDP-shard-safe. The draft is small (5 layers) so
     # no_shard's replicated optimizer state is fine on a large-memory node.
     sharding_strategy="no_shard",
-    # Validated by the pre-flight smoke test (scripts/ccc/00b_smoke.sh); flip to
-    # False if flex_attention triggers a recompile storm at scale.
-    torch_compile=True,
+    # Disabled: the bv 8xH100 smoke test showed torch.compile's inductor backend
+    # fails to build its CUDA helper (gcc/ccache CalledProcessError, missing cuda
+    # dev toolchain on the compute nodes). flex_attention still runs eager without
+    # compile, so training is correct — just without the compile speedup. Re-enable
+    # only if a smoke test passes the recompile/compile check on the target cluster.
+    torch_compile=False,
 )
 
 logging = dict(
